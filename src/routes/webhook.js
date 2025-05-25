@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
+
 const { obtenerRespuestaGPT } = require('../services/openai');
 const { enviarMensajeWhatsApp } = require('../services/whatsapp');
 const Conversacion = require('../models/conversacion');
+const ConversacionHistorica = require('../models/conversacionHistorica');
+const { obtenerConversacionActiva } = require('../utils/sesion');
 
-// Webhook de verificación (Meta lo usa para validar la URL)
+// Webhook de verificación
 router.get('/', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -28,37 +31,40 @@ router.post('/', async (req, res) => {
     if (message && message.text && message.from) {
       const texto = message.text.body;
       const telefono = message.from;
-
       console.log(`📥 Mensaje recibido de ${telefono}: ${texto}`);
 
-      // Buscar o crear conversación en MongoDB
-      let conversacion = await Conversacion.findOne({ telefono });
+      const conversacion = await obtenerConversacionActiva(telefono);
 
-      if (!conversacion) {
-        conversacion = new Conversacion({ telefono, mensajes: [] });
-      }
+      // Crear nuevos mensajes con timestamp
+      const nuevoMensajeUsuario = { role: 'user', content: texto, timestamp: new Date() };
 
-      // Agregar mensaje del usuario
-      conversacion.mensajes.push({ role: 'user', content: texto });
+      // Preparar historial reciente (máximo 10)
+      const historialFiltrado = conversacion.mensajes
+        .filter(m => m.role && typeof m.content === 'string' && m.content.trim() !== '');
+
+      historialFiltrado.push(nuevoMensajeUsuario);
+
+      const { respuesta, tokens } = await obtenerRespuestaGPT(historialFiltrado);
+      console.log(`🔢 Tokens usados en esta interacción: ${tokens}`);
+      const nuevoMensajeBot = { role: 'assistant', content: respuesta, timestamp: new Date() };
+
+      // Guardar en conversación activa
+      conversacion.mensajes = [...conversacion.mensajes, nuevoMensajeUsuario, nuevoMensajeBot];
       conversacion.ultima_interaccion = new Date();
       await conversacion.save();
 
-      // Preparar historial para OpenAI (últimos 10 mensajes)
-      const historial = conversacion.mensajes.slice(-10);
+      // Guardar en conversación histórica
+      await ConversacionHistorica.create({
+        telefono,
+        mensajes: [nuevoMensajeUsuario, nuevoMensajeBot],
+        fecha: new Date()
+      });
 
-      // Obtener respuesta de OpenAI
-      const respuesta = await obtenerRespuestaGPT(historial);
-
-      // Guardar respuesta del bot
-      conversacion.mensajes.push({ role: 'assistant', content: respuesta });
-      conversacion.ultima_interaccion = new Date();
-      await conversacion.save();
-
-      // Enviar mensaje por WhatsApp
+      // Enviar respuesta al usuario
       await enviarMensajeWhatsApp(telefono, respuesta);
     }
 
-    res.sendStatus(200); // WhatsApp espera un 200 OK
+    res.sendStatus(200);
   } catch (error) {
     console.error('❌ Error en el webhook:', error);
     res.sendStatus(500);

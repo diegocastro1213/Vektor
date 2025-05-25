@@ -1,3 +1,6 @@
+console.log("🔐 API Key cargada:", process.env.OPENAI_API_KEY?.slice(0, 10), "...");
+
+
 // Cargar variables de entorno
 require('dotenv').config();
 

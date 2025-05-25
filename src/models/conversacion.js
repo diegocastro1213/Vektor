@@ -9,8 +9,8 @@ const mensajeSchema = new mongoose.Schema({
   }
 });
 
-const conversacionSchema = new mongoose.Schema({
-  telefono: { type: String, required: true },
+const conversacionActivaSchema = new mongoose.Schema({
+  telefono: { type: String, required: true, unique: true },
   mensajes: [mensajeSchema],
   ultima_interaccion: {
     type: Date,
@@ -18,4 +18,4 @@ const conversacionSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model("Conversacion", conversacionSchema);
+module.exports = mongoose.model("Conversacion", conversacionActivaSchema);
