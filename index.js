@@ -19,14 +19,8 @@ app.use(express.json());
 const webhookRoutes = require('./src/routes/webhook');
 app.use('/webhook', webhookRoutes);
 
-//configuración del tipo de bot y funcionalidades
-const configRoutes = require('./src/routes/config');
-app.use('/config', configRoutes);
-
 // Puerto
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
 });
-
-

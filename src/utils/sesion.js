@@ -1,22 +1,15 @@
 const Conversacion = require('../models/conversacion');
-const Cliente = require('../models/cliente'); // ✅ nuevo
 
 async function obtenerConversacionActiva(telefono) {
   const ahora = new Date();
   let conversacion = await Conversacion.findOne({ telefono });
 
   if (!conversacion) {
-    // ✅ Buscar tipoBot desde la colección de clientes
-    const cliente = await Cliente.findOne({ telefono, estado: 'activo' });
-    const tipoBot = cliente?.tipoBot || '1_asistente_ventas'; // valor por defecto si no hay cliente
-
     conversacion = new Conversacion({
       telefono,
       mensajes: [],
-      ultima_interaccion: ahora,
-      tipoBot // ✅ lo guardamos
+      ultima_interaccion: ahora
     });
-
     await conversacion.save();
     return conversacion;
   }

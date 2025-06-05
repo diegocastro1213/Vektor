@@ -1,7 +1,4 @@
 const OpenAI = require('openai');
-const Conversacion = require('../models/conversacion');
-const Cliente = require('../models/cliente');
-const { getBotConfig } = require('../utils/getBotConfig');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -10,31 +7,14 @@ const openai = new OpenAI({
 /**
  * Genera una respuesta desde OpenAI con el historial ya validado.
  * @param {Array} historialMensajes - Lista de mensajes [{role, content}]
- * @param {string} telefono - Teléfono del usuario (para obtener tipoBot)
  * @returns {object} { respuesta, tokens }
  */
-async function obtenerRespuestaGPT(historialMensajes, telefono) {
+async function obtenerRespuestaGPT(historialMensajes) {
   try {
-    // Buscar tipoBot en base de clientes, no en conversación
-    const cliente = await Cliente.findOne({ telefono });
-
-    if (!cliente?.tipoBot) {
-      console.error(`🚫 No autorizado: número ${telefono} sin tipoBot.`);
-      return {
-        respuesta: '❌ Este número no está autorizado para usar este servicio.',
-        tokens: 0
-      };
-    }
-
-    const config = getBotConfig(cliente.tipoBot);
-
     const completion = await openai.chat.completions.create({
-      model: config.modelo || 'gpt-4o',
+      model: 'gpt-4o',
       messages: [
-        {
-          role: 'system',
-          content: config.prompt_inicial || 'Eres un asistente virtual.'
-        },
+        { role: 'system', content: 'Eres un asistente virtual profesional y amable, sé lo más breve, corto y puntual posible, sin dejar de ser cordial.' },
         ...historialMensajes
       ]
     });
@@ -50,5 +30,3 @@ async function obtenerRespuestaGPT(historialMensajes, telefono) {
 }
 
 module.exports = { obtenerRespuestaGPT };
-
-
