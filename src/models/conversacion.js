@@ -15,12 +15,9 @@ const conversacionActivaSchema = new mongoose.Schema({
   ultima_interaccion: {
     type: Date,
     default: Date.now
-<<<<<<< HEAD
   },
-  tipoBot: { type: String, required: true } // ❌ sin default, requerido
-=======
-  }
->>>>>>> parent of 5099430 (Agregar funcionalidad y tipo de bot)
+  tipoBot: { type: String, default: 'asistente_ventas' } // ✅ NUEVO CAMPO
 });
 
 module.exports = mongoose.model("Conversacion", conversacionActivaSchema);
+
