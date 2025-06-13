@@ -15,7 +15,9 @@ const conversacionActivaSchema = new mongoose.Schema({
   ultima_interaccion: {
     type: Date,
     default: Date.now
-  }
+  },
+  tipoBot: { type: String, required: true } // ❌ Sin default, sigue siendo requerido
 });
 
 module.exports = mongoose.model("Conversacion", conversacionActivaSchema);
+

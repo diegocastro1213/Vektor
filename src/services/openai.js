@@ -1,22 +1,57 @@
 const OpenAI = require('openai');
+const Conversacion = require('../models/conversacion');
+const Cliente = require('../models/cliente');
+const { getBotConfig } = require('../utils/getBotConfig');
+const { consultarSQL } = require('../utils/sql'); // ✅ añadimos esto
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-/**
- * Genera una respuesta desde OpenAI con el historial ya validado.
- * @param {Array} historialMensajes - Lista de mensajes [{role, content}]
- * @returns {object} { respuesta, tokens }
- */
-async function obtenerRespuestaGPT(historialMensajes) {
+async function obtenerRespuestaGPT(historialMensajes, telefono) {
   try {
+    const cliente = await Cliente.findOne({ telefono });
+
+    if (!cliente?.tipoBot) {
+      console.error(`🚫 No autorizado: número ${telefono} sin tipoBot.`);
+      return {
+        respuesta: '❌ Este número no está autorizado para usar este servicio.',
+        tokens: 0
+      };
+    }
+
+    const config = getBotConfig(cliente.tipoBot);
+
+    const mensajes = [
+      {
+        role: 'system',
+        content: config.prompt_inicial || 'Eres un asistente virtual.'
+      }
+    ];
+
+    // ✅ Inyectar catálogo si SQL está habilitado
+    if (config.sql_config?.enabled && config.funcionalidades?.sql === true) {
+      try {
+        const tiposRaw = await consultarSQL("SELECT DISTINCT Tipo FROM Productos", config.sql_config);
+        const modelosRaw = await consultarSQL("SELECT DISTINCT CompatibleCon FROM Productos", config.sql_config);
+
+        const tipos = tiposRaw?.map(r => r.Tipo).filter(Boolean) || [];
+        const modelos = modelosRaw?.map(r => r.CompatibleCon).filter(Boolean) || [];
+
+        mensajes.push({
+          role: 'system',
+          content: `Catálogos actualizados:\nTipos disponibles: ${tipos.join(', ')}\nModelos compatibles: ${modelos.join(', ')}\n\nUsa únicamente estos valores reales para construir cualquier consulta SQL.`
+        });
+      } catch (e) {
+        console.warn('⚠️ No se pudo inyectar catálogo SQL dinámico:', e.message);
+      }
+    }
+
+    mensajes.push(...historialMensajes);
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: 'Eres un asistente virtual profesional y amable, sé lo más breve, corto y puntual posible, sin dejar de ser cordial.' },
-        ...historialMensajes
-      ]
+      model: config.modelo || 'gpt-4o',
+      messages: mensajes
     });
 
     const respuesta = completion.choices[0].message.content;
@@ -30,3 +65,5 @@ async function obtenerRespuestaGPT(historialMensajes) {
 }
 
 module.exports = { obtenerRespuestaGPT };
+
+
